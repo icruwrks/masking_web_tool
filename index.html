@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQLマスキングツール</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        button {
+            background-color: #007acc;
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #005a9e;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .example {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .example h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .example code {
+            background-color: white;
+            padding: 10px;
+            border-radius: 4px;
+            display: block;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            border: 1px solid #dee2e6;
+        }
+        
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .warning strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SQLマスキングツール</h1>
+        <p class="description">
+            SQLのテーブル名やカラム名を一般化して、セキュリティ的に安全な形式に変換します
+        </p>
+        
+        <div class="warning">
+            <strong>注意:</strong>
+            このツールは機密情報を含むSQLを安全に共有するためのものです。変換後も十分に内容を確認してください。
+        </div>
+        
+        <div class="form-group">
+            <label for="inputSql">入力SQL:</label>
+            <textarea id="inputSql" placeholder="ここにSQLを入力してください...">SELECT employee_id, first_name, last_name, salary
+FROM employees
+WHERE department_id = 10;</textarea>
+        </div>
+        
+        <div class="button-container">
+            <button onclick="maskSql()">変換実行</button>
+            <button onclick="clearAll()" style="background-color: #6c757d; margin-left: 10px;">クリア</button>
+        </div>
+        
+        <div class="form-group">
+            <label for="outputSql">変換結果:</label>
+            <textarea id="outputSql" readonly placeholder="変換結果がここに表示されます..."></textarea>
+        </div>
+        
+        <div class="example">
+            <h3>使用例</h3>
+            <strong>入力:</strong>
+            <code>SELECT employee_id, first_name, last_name, salary
+FROM employees
+WHERE department_id = 10;</code>
+            
+            <strong>出力:</strong>
+            <code>SELECT column1, column2, column3, column4
+FROM table1
+WHERE column5 = 10;</code>
+        </div>
+    </div>
+
+    <script>
+        // テーブル名とカラム名のマッピングを保持
+        let tableMapping = {};
+        let columnMapping = {};
+        let tableCounter = 1;
+        let columnCounter = 1;
+
+        function maskSql() {
+            const inputSql = document.getElementById('inputSql').value.trim();
+            
+            if (!inputSql) {
+                alert('SQLを入力してください。');
+                return;
+            }
+            
+            // マッピングをリセット
+            tableMapping = {};
+            columnMapping = {};
+            tableCounter = 1;
+            columnCounter = 1;
+            
+            let maskedSql = inputSql;
+            
+            // SQLをトークンに分割（大文字小文字を区別しない正規表現）
+            const tokens = inputSql.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+            
+            // SQLキーワードのセット（大文字小文字を区別しない）
+            const sqlKeywords = new Set([
+                'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER',
+                'TABLE', 'INDEX', 'VIEW', 'DATABASE', 'SCHEMA', 'PRIMARY', 'FOREIGN', 'KEY',
+                'CONSTRAINT', 'NOT', 'NULL', 'DEFAULT', 'AUTO_INCREMENT', 'UNIQUE',
+                'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'OUTER', 'ON', 'USING',
+                'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET',
+                'UNION', 'INTERSECT', 'EXCEPT', 'ALL', 'DISTINCT',
+                'AS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+                'IF', 'EXISTS', 'IN', 'BETWEEN', 'LIKE', 'IS',
+                'AND', 'OR', 'XOR', 'NOT',
+                'COUNT', 'SUM', 'AVG', 'MIN', 'MAX',
+                'VARCHAR', 'CHAR', 'TEXT', 'INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT',
+                'DECIMAL', 'NUMERIC', 'FLOAT', 'DOUBLE', 'REAL',
+                'DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR',
+                'BOOLEAN', 'BOOL', 'BIT',
+                'BLOB', 'CLOB', 'BINARY', 'VARBINARY'
+            ]);
+            
+            // ユニークなトークンを抽出（SQLキーワード、数値、引用符で囲まれた文字列を除外）
+            const uniqueTokens = [...new Set(tokens)].filter(token => {
+                const upperToken = token.toUpperCase();
+                return !sqlKeywords.has(upperToken) && 
+                       !/^\d+$/.test(token) && // 数値を除外
+                       token.length > 1; // 1文字のトークンを除外
+            });
+            
+            // FROMキーワードの後に来るトークンをテーブル名として識別
+            const fromMatches = maskedSql.match(/\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
+            if (fromMatches) {
+                fromMatches.forEach(match => {
+                    const tableName = match.replace(/^FROM\s+/i, '');
+                    if (!tableMapping[tableName.toLowerCase()]) {
+                        tableMapping[tableName.toLowerCase()] = `table${tableCounter++}`;
+                    }
+                });
+            }
+            
+            // JOINキーワードの後に来るトークンもテーブル名として識別
+            const joinMatches = maskedSql.match(/\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi);
+            if (joinMatches) {
+                joinMatches.forEach(match => {
+                    const tableName = match.replace(/^JOIN\s+/i, '');
+                    if (!tableMapping[tableName.toLowerCase()]) {
+                        tableMapping[tableName.toLowerCase()] = `table${tableCounter++}`;
+                    }
+                });
+            }
+            
+            // 残りのトークンをカラム名として扱う
+            uniqueTokens.forEach(token => {
+                const lowerToken = token.toLowerCase();
+                if (!tableMapping[lowerToken] && !columnMapping[lowerToken]) {
+                    columnMapping[lowerToken] = `column${columnCounter++}`;
+                }
+            });
+            
+            // テーブル名を置換（大文字小文字を区別しない）
+            Object.keys(tableMapping).forEach(originalTable => {
+                const regex = new RegExp(`\\b${originalTable}\\b`, 'gi');
+                maskedSql = maskedSql.replace(regex, tableMapping[originalTable]);
+            });
+            
+            // カラム名を置換（大文字小文字を区別しない）
+            Object.keys(columnMapping).forEach(originalColumn => {
+                const regex = new RegExp(`\\b${originalColumn}\\b`, 'gi');
+                maskedSql = maskedSql.replace(regex, columnMapping[originalColumn]);
+            });
+            
+            document.getElementById('outputSql').value = maskedSql;
+        }
+        
+        function clearAll() {
+            document.getElementById('inputSql').value = '';
+            document.getElementById('outputSql').value = '';
+            tableMapping = {};
+            columnMapping = {};
+            tableCounter = 1;
+            columnCounter = 1;
+        }
+        
+        // エンターキーでの実行を防ぐ
+        document.getElementById('inputSql').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && event.ctrlKey) {
+                event.preventDefault();
+                maskSql();
+            }
+        });
+    </script>
+</body>
+</html>
